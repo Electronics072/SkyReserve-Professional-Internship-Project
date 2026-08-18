@@ -1,0 +1,24 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Choose Seat | SkyReserve</title><link rel="stylesheet" href="/css/style.css"></head>
+<body><div th:replace="~{fragments :: nav}"></div>
+<main class="container narrow">
+  <div class="page-title"><span class="eyebrow">STEP 2 OF 3</span><h1>Complete Booking</h1><p><b th:text="${flight.flightNumber}"></b> · <span th:text="${flight.source + ' → ' + flight.destination}"></span> · <span th:text="${schedule.travelDate}"></span></p></div>
+  <form method="post" action="/bookings/checkout" class="booking-layout">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="scheduleId" th:value="${schedule.id}">
+    <section class="card">
+      <h2>Passenger details</h2>
+      <label>Passenger Name</label><input name="passengerName" placeholder="Full name as on ID" required>
+      <label>Travel Class</label><select name="seatClass"><option>Economy</option><option>Business</option></select>
+      <div class="legend"><span><i class="seat available"></i> Available</span><span><i class="seat occupied"></i> Occupied</span><span><i class="seat selected"></i> Selected</span></div>
+      <h2>Choose your seat</h2>
+      <div class="aircraft"><div class="cockpit">✈ COCKPIT</div><div class="seat-map">
+        <label class="seat-option" th:each="s:${seats}" th:classappend="${occupiedSeats.contains(s)} ? ' is-occupied' : ''">
+          <input type="radio" name="seatNumber" th:value="${s}" th:disabled="${occupiedSeats.contains(s)}" required>
+          <span class="seat" th:text="${s}"></span>
+        </label>
+      </div></div>
+    </section>
+    <aside class="card summary-card"><span class="eyebrow">BOOKING SUMMARY</span><h2 th:text="${flight.flightNumber}"></h2><p><b th:text="${flight.source}"></b> → <b th:text="${flight.destination}"></b></p><p th:text="${schedule.travelDate}"></p><hr><p>Economy <b th:text="${'₹' + #numbers.formatDecimal(flight.economyPrice,1,2)}"></b></p><p>Business <b th:text="${'₹' + #numbers.formatDecimal(flight.businessPrice,1,2)}"></b></p><button class="btn primary full" type="submit">Continue to Secure Payment →</button><p class="muted small">Seat allocation is protected by a transaction and database uniqueness constraint.</p></aside>
+  </form>
+</main></body></html>

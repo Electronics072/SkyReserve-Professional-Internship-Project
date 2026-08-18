@@ -1,0 +1,36 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SkyReserve | Airline Reservation</title><link rel="stylesheet" href="/css/style.css"></head>
+<body>
+<div th:replace="~{fragments :: nav}"></div>
+<main class="container">
+  <section class="hero hero-home">
+    <div class="hero-content">
+      <span class="eyebrow">SMART AIR TRAVEL</span>
+      <h1>Book your next journey with <span>SkyReserve</span></h1>
+      <p>Search flights, choose your seat and manage your booking from one secure platform.</p><div class="account-notice"><b>Sign in or create an account before searching.</b> Your reservation history and payment details are protected by your account.</div>
+      <form action="/search" class="search-panel">
+        <div><label>From</label><select name="source" required><option value="">Select origin</option><option th:each="city:${cities}" th:value="${city}" th:text="${city}"></option></select></div>
+        <div><label>To</label><select name="destination" required><option value="">Select destination</option><option th:each="city:${cities}" th:value="${city}" th:text="${city}"></option></select></div>
+        <div><label>Travel date</label><input type="date" name="date" th:value="${T(java.time.LocalDate).now().plusDays(1)}" required></div>
+        <button class="btn primary" type="submit">Search Flights</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="section-heading"><div><span class="eyebrow">WHY SKYRESERVE</span><h2>Everything you need to reserve a flight</h2></div></section>
+  <section class="feature-grid">
+    <div class="feature-card"><div class="feature-icon">🔎</div><h3>Fast Search</h3><p>Find active flights by route and travel date.</p></div>
+    <div class="feature-card"><div class="feature-icon">💺</div><h3>Seat Selection</h3><p>See available and occupied seats before booking.</p></div>
+    <div class="feature-card"><div class="feature-icon">🔐</div><h3>Secure Booking</h3><p>Role-based access and transactional seat allocation.</p></div>
+    <div class="feature-card"><div class="feature-icon">🎫</div><h3>Digital Ticket</h3><p>View, print or download your confirmed e-ticket.</p></div>
+  </section>
+
+  <section class="card demo-card">
+    <div><span class="eyebrow">ACCOUNT ACCESS</span><h2>Start with your SkyReserve account</h2><p>New passenger? Create an account. Returning passenger? Sign in before flight search.</p></div>
+    <div class="actions"><a class="btn secondary" href="/login">Login</a><a class="btn primary" href="/register">Sign up</a></div>
+  </section>
+</main>
+<footer>SkyReserve — Final Year Internship Project</footer>
+</body>
+</html>

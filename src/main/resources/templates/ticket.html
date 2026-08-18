@@ -1,0 +1,11 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>E-Ticket | SkyReserve</title><link rel="stylesheet" href="/css/style.css"></head>
+<body><div th:replace="~{fragments :: nav}"></div><main class="container narrow">
+<section class="ticket card">
+  <div class="ticket-head"><div><span class="eyebrow">E-TICKET</span><h1>SkyReserve</h1></div><div class="ticket-code" th:text="${booking.bookingReference}"></div></div>
+  <div class="boarding"><div><span class="muted">FROM</span><strong th:text="${booking.schedule.flight.source}"></strong></div><span class="plane-line">✈</span><div><span class="muted">TO</span><strong th:text="${booking.schedule.flight.destination}"></strong></div></div>
+  <div class="ticket-grid"><div><span class="muted">Passenger</span><b th:text="${booking.passengerName}"></b></div><div><span class="muted">Flight</span><b th:text="${booking.schedule.flight.flightNumber}"></b></div><div><span class="muted">Date</span><b th:text="${booking.schedule.travelDate}"></b></div><div><span class="muted">Seat</span><b th:text="${booking.seatNumber}"></b></div><div><span class="muted">Class</span><b th:text="${booking.seatClass}"></b></div><div><span class="muted">Amount</span><b th:text="${'₹' + #numbers.formatDecimal(booking.amount,1,2)}"></b></div><div><span class="muted">Payment</span><b th:text="${booking.paymentMethod}"></b></div></div>
+  <div class="ticket-status" th:text="${booking.status}"></div>
+  <div class="actions"><a class="btn secondary" th:href="@{/bookings/{ref}/pdf(ref=${booking.bookingReference})}">Download PDF</a><button class="btn primary" onclick="window.print()">Print Ticket</button></div>
+</section></main></body></html>

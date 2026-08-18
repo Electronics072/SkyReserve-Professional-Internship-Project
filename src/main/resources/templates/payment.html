@@ -1,0 +1,47 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Payment | SkyReserve</title><link rel="stylesheet" href="/css/style.css"></head>
+<body><div th:replace="~{fragments :: nav}"></div>
+<main class="container narrow">
+  <div class="page-title"><span class="eyebrow">STEP 3 OF 3</span><h1>Secure Demo Payment</h1><p>Complete the simulated payment to confirm your reservation.</p></div>
+  <div class="payment-layout">
+    <section class="card">
+      <div class="secure-banner">🔒 Secure checkout · Demo mode</div>
+      <h2>Choose payment method</h2>
+      <form method="post" action="/bookings/create" id="paymentForm">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <input type="hidden" name="scheduleId" th:value="${schedule.id}">
+        <input type="hidden" name="passengerName" th:value="${passengerName}">
+        <input type="hidden" name="seatNumber" th:value="${seatNumber}">
+        <input type="hidden" name="seatClass" th:value="${seatClass}">
+        <input type="hidden" name="paymentMethod" id="paymentMethod" value="UPI">
+        <div class="payment-tabs">
+          <button type="button" class="payment-tab active" onclick="payTab('upi',this)">UPI</button>
+          <button type="button" class="payment-tab" onclick="payTab('card',this)">Credit / Debit Card</button>
+          <button type="button" class="payment-tab" onclick="payTab('bank',this)">Net Banking</button>
+          <button type="button" class="payment-tab" onclick="payTab('wallet',this)">Wallets</button>
+        </div>
+        <div id="pay-upi" class="payment-panel active">
+          <p class="muted">Select a demo UPI application.</p>
+          <div class="upi-grid"><button type="button" onclick="selectPay('Google Pay',this)">G<br><small>Google Pay</small></button><button type="button" onclick="selectPay('PhonePe',this)">पे<br><small>PhonePe</small></button><button type="button" onclick="selectPay('Paytm UPI',this)">P<br><small>Paytm</small></button><button type="button" onclick="selectPay('BHIM UPI',this)">B<br><small>BHIM</small></button></div>
+          <label>UPI ID (demo)<input placeholder="name@upi"></label>
+        </div>
+        <div id="pay-card" class="payment-panel">
+          <label>Card number<input placeholder="1234 5678 9012 3456" maxlength="19"></label>
+          <label>Card holder<input placeholder="Name on card"></label>
+          <div class="two-col"><label>Expiry<input placeholder="MM/YY"></label><label>CVV<input type="password" placeholder="•••" maxlength="4"></label></div>
+        </div>
+        <div id="pay-bank" class="payment-panel"><label>Select bank<select onchange="selectPay(this.value,this)"><option>State Bank of India</option><option>HDFC Bank</option><option>ICICI Bank</option><option>Axis Bank</option></select></label></div>
+        <div id="pay-wallet" class="payment-panel"><div class="wallet-options"><button type="button" onclick="selectPay('Paytm Wallet',this)">Paytm Wallet</button><button type="button" onclick="selectPay('Amazon Pay',this)">Amazon Pay</button><button type="button" onclick="selectPay('MobiKwik',this)">MobiKwik</button></div></div>
+        <button class="btn primary full pay-btn" type="submit">Pay ₹<span th:text="${#numbers.formatDecimal(total,1,2)}"></span> & Confirm Booking</button>
+        <p class="muted small center">No real money or payment credentials are processed. This is a realistic payment-gateway simulation for the internship project.</p>
+      </form>
+    </section>
+    <aside class="card summary-card"><span class="eyebrow">ORDER SUMMARY</span><h2 th:text="${flight.flightNumber}"></h2><p><b th:text="${flight.source}"></b> → <b th:text="${flight.destination}"></b></p><p th:text="${schedule.travelDate}"></p><p>Passenger <b th:text="${passengerName}"></b></p><p>Seat <b th:text="${seatNumber}"></b></p><p>Class <b th:text="${seatClass}"></b></p><hr><p>Base fare <b th:text="${'₹'+#numbers.formatDecimal(fare,1,2)}"></b></p><p>Service fee <b th:text="${'₹'+#numbers.formatDecimal(serviceFee,1,2)}"></b></p><p class="total-line">Total <b th:text="${'₹'+#numbers.formatDecimal(total,1,2)}"></b></p></aside>
+  </div>
+</main>
+<script>
+function payTab(id,btn){document.querySelectorAll('.payment-panel').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.payment-tab').forEach(x=>x.classList.remove('active'));document.getElementById('pay-'+id).classList.add('active');btn.classList.add('active');const names={upi:'UPI',card:'Credit/Debit Card',bank:'Net Banking',wallet:'Digital Wallet'};document.getElementById('paymentMethod').value=names[id]||'UPI';}
+function selectPay(name,el){document.getElementById('paymentMethod').value=name;document.querySelectorAll('.payment-option-selected').forEach(x=>x.classList.remove('payment-option-selected'));if(el)el.classList.add('payment-option-selected');}
+</script>
+</body></html>

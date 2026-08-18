@@ -1,0 +1,1 @@
+package com.skyreserve.model; public enum SeatStatus { AVAILABLE, BOOKED }

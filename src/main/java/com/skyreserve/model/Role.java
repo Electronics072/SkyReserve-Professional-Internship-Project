@@ -1,0 +1,1 @@
+package com.skyreserve.model; public enum Role { USER, ADMIN }

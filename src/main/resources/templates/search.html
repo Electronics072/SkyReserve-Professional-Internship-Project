@@ -1,0 +1,14 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Search Flights | SkyReserve</title><link rel="stylesheet" href="/css/style.css"></head>
+<body><div th:replace="~{fragments :: nav}"></div>
+<main class="container">
+  <div class="page-title"><span class="eyebrow">FLIGHT SEARCH</span><h1>Available Flights</h1><p th:text="${'Travel date: ' + date}"></p></div>
+  <div th:if="${#lists.isEmpty(results)}" class="alert error">No active flights found for this route. Try another destination.</div>
+  <section class="flight-list" th:if="${!#lists.isEmpty(results)}">
+    <article class="flight-card" th:each="f:${results}">
+      <div class="flight-main"><div><span class="flight-number" th:text="${f.flightNumber}"></span><p class="muted" th:text="${f.airline}"></p></div><div class="route"><strong th:text="${f.source}"></strong><span>→</span><strong th:text="${f.destination}"></strong></div><div><b th:text="${f.departureTime}"></b><span class="muted"> – </span><b th:text="${f.arrivalTime}"></b></div></div>
+      <div class="flight-meta"><span>Economy <b th:text="${'₹' + #numbers.formatDecimal(f.economyPrice,1,2)}"></b></span><span>Business <b th:text="${'₹' + #numbers.formatDecimal(f.businessPrice,1,2)}"></b></span><span class="availability"><b th:text="${availableMap.get(f.id)}"></b> seats available</span><a class="btn primary" th:href="@{/bookings/new(flightId=${f.id},date=${date})}">Select Flight</a></div>
+    </article>
+  </section>
+</main></body></html>

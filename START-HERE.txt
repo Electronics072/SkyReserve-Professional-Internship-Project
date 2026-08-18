@@ -1,0 +1,69 @@
+SKYRESERVE PROFESSIONAL INTERNSHIP PROJECT — FINAL BUILD
+========================================================
+
+This build is based on the verified SkyReserve-Final-1.0 Spring Boot project and
+keeps its database-backed booking, seat locking, admin dashboard, analytics,
+scheduling, cancellation and e-ticket functionality.
+
+MAJOR FIXES IN THIS BUILD
+--------------------------
+1. LOGIN / SIGNUP BEFORE FLIGHT SEARCH
+   - Home page has visible Login and Sign up buttons.
+   - Flight search requires authentication through Spring Security.
+   - If a logged-out visitor submits a search, they are sent to Login first.
+   - After successful login, Spring Security returns them to the requested search.
+
+2. ADMIN SECURITY + FLIGHT VALIDATION
+   - /admin/** is protected server-side with ROLE_ADMIN.
+   - Normal users cannot access the Admin portal directly.
+   - Admin flight creation requires all required information.
+   - Source and destination cannot be the same.
+   - Duplicate flight numbers are rejected.
+   - Fares must be positive.
+   - Seat count must be 6–180.
+   - Times must use HH:MM.
+
+3. PAYMENT GATEWAY SIMULATION
+   - Seat selection -> passenger details -> Secure Demo Payment -> confirmation.
+   - UPI: Google Pay, PhonePe, Paytm UPI, BHIM.
+   - Credit/Debit Card.
+   - Net Banking.
+   - Wallets: Paytm, Amazon Pay, MobiKwik.
+   - No real money or payment credentials are processed.
+   - Payment method/status are stored with the booking.
+
+4. MULTI-ROUTE FLIGHT SEARCH
+   - Search is database-backed, not hard-coded to one route.
+   - Demo data includes multiple routes and cities.
+   - Cancelled/non-scheduled schedules are not shown as bookable search results.
+
+5. ADMIN CONTROL CENTER
+   - Dashboard statistics.
+   - Flight management and activate/deactivate.
+   - Add flight.
+   - Create schedules.
+   - Update schedule status.
+   - Booking analytics.
+   - Revenue by route.
+   - User directory.
+
+RUN
+---
+1. Open the folder containing pom.xml in IntelliJ IDEA.
+2. Use Java 17 or newer.
+3. Allow Maven dependencies to load.
+4. Run com.skyreserve.SkyReserveApplication.
+5. Open http://localhost:8080
+
+DEMO ACCOUNTS
+-------------
+Passenger: user@skyreserve.local / user123
+Admin:     admin@skyreserve.local / admin123
+
+IMPORTANT
+---------
+The payment gateway is intentionally a simulation for an internship/project demo.
+For a real deployment, payment processing must be implemented through a trusted
+payment provider and server-side secrets must never be placed in the frontend.
+
+The H2 console is for local development only and should not be exposed publicly.
