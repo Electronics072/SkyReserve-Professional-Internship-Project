@@ -14,7 +14,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.SessionAttributes;
 
 import com.lowagie.text.Document;
 import com.lowagie.text.Paragraph;
@@ -27,7 +26,6 @@ import java.util.List;
 
 @Controller
 @RequestMapping("/bookings")
-@SessionAttributes("razorpayPending")
 public class BookingController {
     private final FlightRepository flights;
     private final FlightScheduleRepository schedules;
@@ -42,73 +40,41 @@ public class BookingController {
     String form(@RequestParam Long flightId, @RequestParam(required = false) LocalDate date, Model m) {
         Flight f = flights.findById(flightId).orElseThrow();
         LocalDate d = date == null ? LocalDate.now().plusDays(1) : date;
-        FlightSchedule sc = schedules.findByFlightIdAndTravelDate(flightId, d)
-                .orElseGet(() -> schedules.save(new FlightSchedule(f, d)));
-        List<String> seats = generateSeats(f.getTotalSeats());
-        m.addAttribute("schedule", sc);
-        m.addAttribute("flight", f);
-        m.addAttribute("seats", seats);
+        FlightSchedule sc = schedules.findByFlightIdAndTravelDate(flightId, d).orElseGet(() -> schedules.save(new FlightSchedule(f, d)));
+        m.addAttribute("schedule", sc); m.addAttribute("flight", f); m.addAttribute("seats", generateSeats(f.getTotalSeats()));
         m.addAttribute("occupiedSeats", service.occupiedSeats(sc.getId()));
         return "booking";
     }
 
     @PostMapping("/checkout")
-    String checkout(@RequestParam Long scheduleId,
-                    @RequestParam String passengerName,
-                    @RequestParam String seatNumber,
-                    @RequestParam String seatClass,
-                    Model m) {
-        if (passengerName == null || passengerName.trim().isEmpty()) {
-            m.addAttribute("error", "Passenger name is required.");
-            return "error";
-        }
+    String checkout(@RequestParam Long scheduleId, @RequestParam String passengerName, @RequestParam String seatNumber,
+                    @RequestParam String seatClass, Model m) {
+        if (passengerName == null || passengerName.trim().isEmpty()) { m.addAttribute("error", "Passenger name is required."); return "error"; }
         FlightSchedule sc = schedules.findById(scheduleId).orElseThrow();
-        m.addAttribute("schedule", sc);
-        m.addAttribute("flight", sc.getFlight());
-        m.addAttribute("passengerName", passengerName.trim());
-        m.addAttribute("seatNumber", seatNumber);
-        m.addAttribute("seatClass", seatClass);
+        m.addAttribute("schedule", sc); m.addAttribute("flight", sc.getFlight()); m.addAttribute("passengerName", passengerName.trim());
+        m.addAttribute("seatNumber", seatNumber); m.addAttribute("seatClass", seatClass);
         double fare = "Business".equalsIgnoreCase(seatClass) ? sc.getFlight().getBusinessPrice() : sc.getFlight().getEconomyPrice();
         double serviceFee = Math.round(fare * 0.05 * 100.0) / 100.0;
-        m.addAttribute("fare", fare);
-        m.addAttribute("serviceFee", serviceFee);
-        m.addAttribute("total", fare + serviceFee);
+        m.addAttribute("fare", fare); m.addAttribute("serviceFee", serviceFee); m.addAttribute("total", fare + serviceFee);
         m.addAttribute("razorpayEnabled", !razorpay.getKeyId().isBlank());
         return "payment";
     }
 
     @PostMapping("/razorpay/order")
     @ResponseBody
-    Object createRazorpayOrder(@RequestParam Long scheduleId,
-                               @RequestParam String passengerName,
-                               @RequestParam String seatNumber,
-                               @RequestParam String seatClass,
-                               Authentication auth,
-                               jakarta.servlet.http.HttpSession session) {
+    Object createRazorpayOrder(@RequestParam Long scheduleId, @RequestParam String passengerName, @RequestParam String seatNumber,
+                               @RequestParam String seatClass, Authentication auth, jakarta.servlet.http.HttpSession session) {
         try {
             FlightSchedule sc = schedules.findById(scheduleId).orElseThrow();
             double fare = "Business".equalsIgnoreCase(seatClass) ? sc.getFlight().getBusinessPrice() : sc.getFlight().getEconomyPrice();
             double serviceFee = Math.round(fare * 0.05 * 100.0) / 100.0;
             double total = fare + serviceFee;
-            String receipt = "SR-" + System.currentTimeMillis();
-            Order order = razorpay.createOrder(total, receipt);
-
-            jakarta.servlet.http.HttpSession s = session;
-            s.setAttribute("rzScheduleId", scheduleId);
-            s.setAttribute("rzPassengerName", passengerName.trim());
-            s.setAttribute("rzSeatNumber", seatNumber.trim().toUpperCase());
-            s.setAttribute("rzSeatClass", seatClass);
-            s.setAttribute("rzEmail", auth.getName());
-            s.setAttribute("rzAmount", total);
-
-            java.util.Map<String,Object> response = new java.util.HashMap<>();
-            response.put("key", razorpay.getKeyId());
-            response.put("orderId", order.get("id"));
-            response.put("amount", order.get("amount"));
-            response.put("currency", order.get("currency"));
-            response.put("name", "SkyReserve");
-            response.put("description", "Flight reservation payment");
-            return response;
+            Order order = razorpay.createOrder(total, "SR-" + System.currentTimeMillis());
+            session.setAttribute("rzScheduleId", scheduleId); session.setAttribute("rzPassengerName", passengerName.trim());
+            session.setAttribute("rzSeatNumber", seatNumber.trim().toUpperCase()); session.setAttribute("rzSeatClass", seatClass);
+            session.setAttribute("rzEmail", auth.getName());
+            return java.util.Map.of("key", razorpay.getKeyId(), "orderId", order.get("id"), "amount", order.get("amount"),
+                    "currency", order.get("currency"), "name", "SkyReserve", "description", "Flight reservation payment");
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
         }
@@ -116,29 +82,20 @@ public class BookingController {
 
     @PostMapping("/razorpay/verify")
     @ResponseBody
-    Object verifyRazorpayPayment(@RequestParam String razorpay_order_id,
-                                 @RequestParam String razorpay_payment_id,
-                                 @RequestParam String razorpay_signature,
-                                 Authentication auth,
-                                 jakarta.servlet.http.HttpSession session) {
+    Object verifyRazorpayPayment(@RequestParam String razorpay_order_id, @RequestParam String razorpay_payment_id,
+                                 @RequestParam String razorpay_signature, Authentication auth, jakarta.servlet.http.HttpSession session) {
         try {
             razorpay.verify(razorpay_order_id, razorpay_payment_id, razorpay_signature);
-            String email = (String) session.getAttribute("rzEmail");
-            Long scheduleId = (Long) session.getAttribute("rzScheduleId");
-            String passenger = (String) session.getAttribute("rzPassengerName");
-            String seat = (String) session.getAttribute("rzSeatNumber");
+            String email = (String) session.getAttribute("rzEmail"); Long scheduleId = (Long) session.getAttribute("rzScheduleId");
+            String passenger = (String) session.getAttribute("rzPassengerName"); String seat = (String) session.getAttribute("rzSeatNumber");
             String seatClass = (String) session.getAttribute("rzSeatClass");
-            if (email == null || scheduleId == null || passenger == null || seat == null || seatClass == null || !email.equalsIgnoreCase(auth.getName())) {
+            if (email == null || scheduleId == null || passenger == null || seat == null || seatClass == null || !email.equalsIgnoreCase(auth.getName()))
                 throw new IllegalStateException("Payment session expired. Please start checkout again.");
-            }
             Booking b = service.create(scheduleId, email, passenger, seat, seatClass, "Razorpay TEST");
             b.setPaymentStatus("PAID_TEST");
-            session.removeAttribute("rzEmail");
-            session.removeAttribute("rzScheduleId");
-            session.removeAttribute("rzPassengerName");
-            session.removeAttribute("rzSeatNumber");
-            session.removeAttribute("rzSeatClass");
-            session.removeAttribute("rzAmount");
+            service.save(b);
+            session.removeAttribute("rzEmail"); session.removeAttribute("rzScheduleId"); session.removeAttribute("rzPassengerName");
+            session.removeAttribute("rzSeatNumber"); session.removeAttribute("rzSeatClass");
             return java.util.Map.of("success", true, "bookingReference", b.getBookingReference(), "paymentId", razorpay_payment_id);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(java.util.Map.of("success", false, "error", e.getMessage()));
@@ -146,76 +103,35 @@ public class BookingController {
     }
 
     @PostMapping("/create")
-    String create(@RequestParam Long scheduleId,
-                  @RequestParam String passengerName,
-                  @RequestParam String seatNumber,
-                  @RequestParam String seatClass,
-                  @RequestParam String paymentMethod,
-                  Authentication auth,
-                  Model m) {
-        try {
-            Booking b = service.create(scheduleId, auth.getName(), passengerName, seatNumber, seatClass, paymentMethod);
-            return "redirect:/bookings/" + b.getBookingReference();
-        } catch (Exception e) {
-            m.addAttribute("error", e.getMessage());
-            return "error";
-        }
+    String create(@RequestParam Long scheduleId, @RequestParam String passengerName, @RequestParam String seatNumber,
+                  @RequestParam String seatClass, @RequestParam String paymentMethod, Authentication auth, Model m) {
+        try { Booking b = service.create(scheduleId, auth.getName(), passengerName, seatNumber, seatClass, paymentMethod); return "redirect:/bookings/" + b.getBookingReference(); }
+        catch (Exception e) { m.addAttribute("error", e.getMessage()); return "error"; }
     }
 
-    @GetMapping
-    String mine(Authentication a, Model m) {
-        m.addAttribute("bookings", service.mine(a.getName()));
-        return "bookings";
-    }
+    @GetMapping String mine(Authentication a, Model m) { m.addAttribute("bookings", service.mine(a.getName())); return "bookings"; }
 
     @GetMapping("/{ref}")
     String view(@PathVariable String ref, Authentication auth, Model m) {
-        Booking b = service.byRef(ref).orElseThrow();
-        boolean admin = auth.getAuthorities().stream().anyMatch(x -> x.getAuthority().equals("ROLE_ADMIN"));
-        if (!admin && !b.getUser().getEmail().equalsIgnoreCase(auth.getName())) {
-            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN);
-        }
-        m.addAttribute("booking", b);
-        return "ticket";
+        Booking b = service.byRef(ref).orElseThrow(); boolean admin = auth.getAuthorities().stream().anyMatch(x -> x.getAuthority().equals("ROLE_ADMIN"));
+        if (!admin && !b.getUser().getEmail().equalsIgnoreCase(auth.getName())) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN);
+        m.addAttribute("booking", b); return "ticket";
     }
 
-    @PostMapping("/{ref}/cancel")
-    String cancel(@PathVariable String ref, Authentication a) {
-        boolean admin = a.getAuthorities().stream().anyMatch(x -> x.getAuthority().equals("ROLE_ADMIN"));
-        service.cancel(ref, a.getName(), admin);
-        return "redirect:/bookings";
-    }
+    @PostMapping("/{ref}/cancel") String cancel(@PathVariable String ref, Authentication a) { boolean admin = a.getAuthorities().stream().anyMatch(x -> x.getAuthority().equals("ROLE_ADMIN")); service.cancel(ref, a.getName(), admin); return "redirect:/bookings"; }
 
     @GetMapping("/{ref}/pdf")
     ResponseEntity<ByteArrayResource> pdf(@PathVariable String ref, Authentication auth) throws Exception {
-        Booking b = service.byRef(ref).orElseThrow();
-        boolean admin = auth.getAuthorities().stream().anyMatch(x -> x.getAuthority().equals("ROLE_ADMIN"));
+        Booking b = service.byRef(ref).orElseThrow(); boolean admin = auth.getAuthorities().stream().anyMatch(x -> x.getAuthority().equals("ROLE_ADMIN"));
         if (!admin && !b.getUser().getEmail().equalsIgnoreCase(auth.getName())) return ResponseEntity.status(403).build();
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        Document document = new Document();
-        PdfWriter.getInstance(document, out);
-        document.open();
-        document.add(new Paragraph("SKYRESERVE E-TICKET"));
-        document.add(new Paragraph("Booking Reference: " + b.getBookingReference()));
-        document.add(new Paragraph("Passenger: " + b.getPassengerName()));
-        document.add(new Paragraph("Flight: " + b.getSchedule().getFlight().getFlightNumber()));
-        document.add(new Paragraph("Route: " + b.getSchedule().getFlight().getSource() + " -> " + b.getSchedule().getFlight().getDestination()));
-        document.add(new Paragraph("Travel Date: " + b.getSchedule().getTravelDate()));
-        document.add(new Paragraph("Seat: " + b.getSeatNumber()));
-        document.add(new Paragraph("Class: " + b.getSeatClass()));
-        document.add(new Paragraph(String.format("Amount: INR %.2f", b.getAmount())));
-        document.add(new Paragraph("Payment Method: " + b.getPaymentMethod()));
-        document.add(new Paragraph("Payment Status: " + b.getPaymentStatus()));
-        document.add(new Paragraph("Status: " + b.getStatus()));
-        document.close();
+        ByteArrayOutputStream out = new ByteArrayOutputStream(); Document document = new Document(); PdfWriter.getInstance(document, out); document.open();
+        document.add(new Paragraph("SKYRESERVE E-TICKET")); document.add(new Paragraph("Booking Reference: " + b.getBookingReference())); document.add(new Paragraph("Passenger: " + b.getPassengerName()));
+        document.add(new Paragraph("Flight: " + b.getSchedule().getFlight().getFlightNumber())); document.add(new Paragraph("Route: " + b.getSchedule().getFlight().getSource() + " -> " + b.getSchedule().getFlight().getDestination()));
+        document.add(new Paragraph("Travel Date: " + b.getSchedule().getTravelDate())); document.add(new Paragraph("Seat: " + b.getSeatNumber())); document.add(new Paragraph("Class: " + b.getSeatClass()));
+        document.add(new Paragraph(String.format("Amount: INR %.2f", b.getAmount()))); document.add(new Paragraph("Payment Method: " + b.getPaymentMethod())); document.add(new Paragraph("Payment Status: " + b.getPaymentStatus())); document.add(new Paragraph("Status: " + b.getStatus())); document.close();
         ByteArrayResource resource = new ByteArrayResource(out.toByteArray());
         return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=SkyReserve-" + b.getBookingReference() + ".pdf").contentType(MediaType.APPLICATION_PDF).contentLength(resource.contentLength()).body(resource);
     }
 
-    private List<String> generateSeats(int totalSeats) {
-        List<String> seats = new ArrayList<>();
-        String[] columns = {"A", "B", "C", "D", "E", "F"};
-        for (int i = 0; i < totalSeats; i++) seats.add((i / columns.length + 1) + columns[i % columns.length]);
-        return seats;
-    }
+    private List<String> generateSeats(int totalSeats) { List<String> seats = new ArrayList<>(); String[] columns = {"A","B","C","D","E","F"}; for (int i=0;i<totalSeats;i++) seats.add((i/columns.length+1)+columns[i%columns.length]); return seats; }
 }
