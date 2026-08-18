@@ -1,12 +1,12 @@
 package com.skyreserve.service;
 
 import jakarta.servlet.http.HttpSession;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
-import java.time.Instant;
 
 @Service
 public class OtpService {
@@ -16,16 +16,15 @@ public class OtpService {
     private static final String SENT_AT = "paymentOtpSentAt";
 
     private final JavaMailSender mailSender;
+    private final String mailFrom;
     private final SecureRandom random = new SecureRandom();
 
-    public OtpService(JavaMailSender mailSender) {
+    public OtpService(JavaMailSender mailSender, @Value("${spring.mail.username:}") String mailFrom) {
         this.mailSender = mailSender;
+        this.mailFrom = mailFrom;
     }
 
-    /**
-     * Creates a short-lived payment verification OTP and tries to email it.
-     * If SMTP is not configured, the generated OTP is returned for demo-mode UI.
-     */
+    /** Creates a short-lived payment OTP and emails it when SMTP is configured. */
     public String sendPaymentOtp(String email, HttpSession session) {
         long now = System.currentTimeMillis();
         Object previous = session.getAttribute(SENT_AT);
@@ -42,6 +41,7 @@ public class OtpService {
 
         try {
             SimpleMailMessage message = new SimpleMailMessage();
+            if (mailFrom != null && !mailFrom.isBlank()) message.setFrom(mailFrom);
             message.setTo(email);
             message.setSubject("SkyReserve Payment Verification OTP");
             message.setText("Your SkyReserve payment verification OTP is " + otp
@@ -49,8 +49,7 @@ public class OtpService {
             mailSender.send(message);
             return null;
         } catch (Exception ex) {
-            // Demo deployments may not have SMTP credentials. The UI can safely
-            // expose this code only as a clearly labelled demo fallback.
+            // If SMTP is not configured, expose only a clearly labelled demo OTP.
             return otp;
         }
     }
@@ -68,27 +67,21 @@ public class OtpService {
             clear(session);
             throw new IllegalStateException("Too many incorrect OTP attempts. Please request a new OTP.");
         }
-
         if (otp == null || !expected.equals(otp.trim())) {
             session.setAttribute(ATTEMPTS, (attempts == null ? 0 : attempts) + 1);
             throw new IllegalStateException("Invalid OTP. Please try again.");
         }
-
         session.setAttribute("otpVerified", true);
         session.removeAttribute(OTP);
         session.removeAttribute(EXPIRES);
         session.removeAttribute(ATTEMPTS);
     }
 
-    public boolean isVerified(HttpSession session) {
-        return Boolean.TRUE.equals(session.getAttribute("otpVerified"));
-    }
+    public boolean isVerified(HttpSession session) { return Boolean.TRUE.equals(session.getAttribute("otpVerified")); }
 
     public void clear(HttpSession session) {
-        session.removeAttribute(OTP);
-        session.removeAttribute(EXPIRES);
-        session.removeAttribute(ATTEMPTS);
-        session.removeAttribute(SENT_AT);
+        session.removeAttribute(OTP); session.removeAttribute(EXPIRES);
+        session.removeAttribute(ATTEMPTS); session.removeAttribute(SENT_AT);
         session.removeAttribute("otpVerified");
     }
 }
