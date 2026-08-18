@@ -4,6 +4,8 @@ import com.skyreserve.model.*;
 import com.skyreserve.repository.FlightRepository;
 import com.skyreserve.repository.FlightScheduleRepository;
 import com.skyreserve.service.BookingService;
+import com.skyreserve.service.RazorpayService;
+import com.razorpay.Order;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -12,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.SessionAttributes;
 
 import com.lowagie.text.Document;
 import com.lowagie.text.Paragraph;
@@ -24,13 +27,15 @@ import java.util.List;
 
 @Controller
 @RequestMapping("/bookings")
+@SessionAttributes("razorpayPending")
 public class BookingController {
     private final FlightRepository flights;
     private final FlightScheduleRepository schedules;
     private final BookingService service;
+    private final RazorpayService razorpay;
 
-    public BookingController(FlightRepository f, FlightScheduleRepository s, BookingService b) {
-        flights = f; schedules = s; service = b;
+    public BookingController(FlightRepository f, FlightScheduleRepository s, BookingService b, RazorpayService r) {
+        flights = f; schedules = s; service = b; razorpay = r;
     }
 
     @GetMapping("/new")
@@ -39,7 +44,6 @@ public class BookingController {
         LocalDate d = date == null ? LocalDate.now().plusDays(1) : date;
         FlightSchedule sc = schedules.findByFlightIdAndTravelDate(flightId, d)
                 .orElseGet(() -> schedules.save(new FlightSchedule(f, d)));
-
         List<String> seats = generateSeats(f.getTotalSeats());
         m.addAttribute("schedule", sc);
         m.addAttribute("flight", f);
@@ -69,7 +73,76 @@ public class BookingController {
         m.addAttribute("fare", fare);
         m.addAttribute("serviceFee", serviceFee);
         m.addAttribute("total", fare + serviceFee);
+        m.addAttribute("razorpayEnabled", !razorpay.getKeyId().isBlank());
         return "payment";
+    }
+
+    @PostMapping("/razorpay/order")
+    @ResponseBody
+    Object createRazorpayOrder(@RequestParam Long scheduleId,
+                               @RequestParam String passengerName,
+                               @RequestParam String seatNumber,
+                               @RequestParam String seatClass,
+                               Authentication auth,
+                               jakarta.servlet.http.HttpSession session) {
+        try {
+            FlightSchedule sc = schedules.findById(scheduleId).orElseThrow();
+            double fare = "Business".equalsIgnoreCase(seatClass) ? sc.getFlight().getBusinessPrice() : sc.getFlight().getEconomyPrice();
+            double serviceFee = Math.round(fare * 0.05 * 100.0) / 100.0;
+            double total = fare + serviceFee;
+            String receipt = "SR-" + System.currentTimeMillis();
+            Order order = razorpay.createOrder(total, receipt);
+
+            jakarta.servlet.http.HttpSession s = session;
+            s.setAttribute("rzScheduleId", scheduleId);
+            s.setAttribute("rzPassengerName", passengerName.trim());
+            s.setAttribute("rzSeatNumber", seatNumber.trim().toUpperCase());
+            s.setAttribute("rzSeatClass", seatClass);
+            s.setAttribute("rzEmail", auth.getName());
+            s.setAttribute("rzAmount", total);
+
+            java.util.Map<String,Object> response = new java.util.HashMap<>();
+            response.put("key", razorpay.getKeyId());
+            response.put("orderId", order.get("id"));
+            response.put("amount", order.get("amount"));
+            response.put("currency", order.get("currency"));
+            response.put("name", "SkyReserve");
+            response.put("description", "Flight reservation payment");
+            return response;
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/razorpay/verify")
+    @ResponseBody
+    Object verifyRazorpayPayment(@RequestParam String razorpay_order_id,
+                                 @RequestParam String razorpay_payment_id,
+                                 @RequestParam String razorpay_signature,
+                                 Authentication auth,
+                                 jakarta.servlet.http.HttpSession session) {
+        try {
+            razorpay.verify(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+            String email = (String) session.getAttribute("rzEmail");
+            Long scheduleId = (Long) session.getAttribute("rzScheduleId");
+            String passenger = (String) session.getAttribute("rzPassengerName");
+            String seat = (String) session.getAttribute("rzSeatNumber");
+            String seatClass = (String) session.getAttribute("rzSeatClass");
+            if (email == null || scheduleId == null || passenger == null || seat == null || seatClass == null || !email.equalsIgnoreCase(auth.getName())) {
+                throw new IllegalStateException("Payment session expired. Please start checkout again.");
+            }
+            Booking b = service.create(scheduleId, email, passenger, seat, seatClass, "Razorpay TEST");
+            b.setPaymentStatus("PAID_TEST");
+            session.removeAttribute("rzEmail");
+            session.removeAttribute("rzScheduleId");
+            session.removeAttribute("rzPassengerName");
+            session.removeAttribute("rzSeatNumber");
+            session.removeAttribute("rzSeatClass");
+            session.removeAttribute("rzAmount");
+            return java.util.Map.of("success", true, "bookingReference", b.getBookingReference(), "paymentId", razorpay_payment_id);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("success", false, "error", e.getMessage()));
+        }
     }
 
     @PostMapping("/create")
@@ -117,9 +190,7 @@ public class BookingController {
     ResponseEntity<ByteArrayResource> pdf(@PathVariable String ref, Authentication auth) throws Exception {
         Booking b = service.byRef(ref).orElseThrow();
         boolean admin = auth.getAuthorities().stream().anyMatch(x -> x.getAuthority().equals("ROLE_ADMIN"));
-        if (!admin && !b.getUser().getEmail().equalsIgnoreCase(auth.getName())) {
-            return ResponseEntity.status(403).build();
-        }
+        if (!admin && !b.getUser().getEmail().equalsIgnoreCase(auth.getName())) return ResponseEntity.status(403).build();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         Document document = new Document();
         PdfWriter.getInstance(document, out);
@@ -138,19 +209,13 @@ public class BookingController {
         document.add(new Paragraph("Status: " + b.getStatus()));
         document.close();
         ByteArrayResource resource = new ByteArrayResource(out.toByteArray());
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=SkyReserve-" + b.getBookingReference() + ".pdf")
-                .contentType(MediaType.APPLICATION_PDF)
-                .contentLength(resource.contentLength())
-                .body(resource);
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=SkyReserve-" + b.getBookingReference() + ".pdf").contentType(MediaType.APPLICATION_PDF).contentLength(resource.contentLength()).body(resource);
     }
 
     private List<String> generateSeats(int totalSeats) {
         List<String> seats = new ArrayList<>();
         String[] columns = {"A", "B", "C", "D", "E", "F"};
-        for (int i = 0; i < totalSeats; i++) {
-            seats.add((i / columns.length + 1) + columns[i % columns.length]);
-        }
+        for (int i = 0; i < totalSeats; i++) seats.add((i / columns.length + 1) + columns[i % columns.length]);
         return seats;
     }
 }
