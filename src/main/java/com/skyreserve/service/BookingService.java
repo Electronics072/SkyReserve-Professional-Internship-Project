@@ -13,12 +13,20 @@ import java.util.*;
 public class BookingService {
     private final BookingRepository bookings; private final FlightScheduleRepository schedules; private final UserRepository users;
     public BookingService(BookingRepository b, FlightScheduleRepository s, UserRepository u) { bookings=b; schedules=s; users=u; }
-    @Transactional public Booking create(Long scheduleId,String email,String passenger,String seat,String seatClass,String paymentMethod){
+
+    @Transactional
+    public Booking create(Long scheduleId,String email,String passenger,String seat,String seatClass,String paymentMethod){
         FlightSchedule sc=schedules.findByIdForUpdate(scheduleId).orElseThrow(()->new IllegalArgumentException("Schedule not found"));
         if(!sc.getFlight().isActive()||!"SCHEDULED".equalsIgnoreCase(sc.getStatus()))throw new IllegalStateException("This flight schedule is not available for booking.");
-        String normalizedSeat=seat.trim().toUpperCase(Locale.ROOT); if(bookings.existsByScheduleIdAndSeatNumberAndStatus(scheduleId,normalizedSeat,BookingStatus.CONFIRMED))throw new IllegalStateException("Seat "+normalizedSeat+" is no longer available. Please choose another seat.");
-        User user=users.findByEmail(email).orElseThrow(); Booking b=new Booking(); b.setBookingReference("SR"+UUID.randomUUID().toString().replace("-","").substring(0,12).toUpperCase(Locale.ROOT)); b.setUser(user); b.setSchedule(sc); b.setPassengerName(passenger.trim()); b.setSeatNumber(normalizedSeat); b.setSeatClass(seatClass); b.setPaymentMethod(paymentMethod==null||paymentMethod.isBlank()?"Demo UPI":paymentMethod.trim()); b.setPaymentStatus("DEMO_PAID");
-        double baseFare="Business".equalsIgnoreCase(seatClass)?sc.getFlight().getBusinessPrice():sc.getFlight().getEconomyPrice(); double serviceFee=Math.round(baseFare*.05*100.0)/100.0; b.setAmount(baseFare+serviceFee);
+        String normalizedSeat=seat.trim().toUpperCase(Locale.ROOT);
+        if(bookings.existsByScheduleIdAndSeatNumberAndStatus(scheduleId,normalizedSeat,BookingStatus.CONFIRMED))throw new IllegalStateException("Seat "+normalizedSeat+" is no longer available. Please choose another seat.");
+        User user=users.findByEmail(email).orElseThrow(); Booking b=new Booking();
+        b.setBookingReference("SR"+UUID.randomUUID().toString().replace("-","").substring(0,12).toUpperCase(Locale.ROOT));
+        b.setUser(user); b.setSchedule(sc); b.setPassengerName(passenger.trim()); b.setSeatNumber(normalizedSeat); b.setSeatClass(seatClass);
+        String method=paymentMethod==null||paymentMethod.isBlank()?"Demo UPI":paymentMethod.trim();
+        b.setPaymentMethod(method); b.setPaymentStatus(method.equalsIgnoreCase("Razorpay TEST")?"PAID_TEST":"DEMO_PAID");
+        double baseFare="Business".equalsIgnoreCase(seatClass)?sc.getFlight().getBusinessPrice():sc.getFlight().getEconomyPrice();
+        double serviceFee=Math.round(baseFare*.05*100.0)/100.0; b.setAmount(baseFare+serviceFee);
         try{return bookings.saveAndFlush(b);}catch(DataIntegrityViolationException ex){throw new IllegalStateException("Seat "+normalizedSeat+" was booked by another user. Please choose another seat.");}
     }
     public Booking save(Booking booking){return bookings.saveAndFlush(booking);}
