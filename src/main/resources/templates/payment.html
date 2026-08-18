@@ -1,47 +1,119 @@
 <!doctype html>
 <html xmlns:th="http://www.thymeleaf.org">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Payment | SkyReserve</title><link rel="stylesheet" href="/css/style.css"></head>
-<body><div th:replace="~{fragments :: nav}"></div>
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Payment | SkyReserve</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    .otp-box{margin:18px 0;padding:18px;border:1px solid rgba(111,44,255,.25);border-radius:14px;background:rgba(111,44,255,.05)}
+    .otp-row{display:flex;gap:10px;align-items:end}.otp-row label{flex:1}.otp-row input{letter-spacing:5px;text-align:center;font-size:20px;font-weight:700}
+    .otp-status{margin:10px 0;font-size:.9rem}.success-text{color:#15803d}.demo-otp{font-weight:700}.disabled-btn{opacity:.55;cursor:not-allowed}
+  </style>
+</head>
+<body>
+<div th:replace="~{fragments :: nav}"></div>
 <main class="container narrow">
-  <div class="page-title"><span class="eyebrow">STEP 3 OF 3</span><h1>Secure Demo Payment</h1><p>Complete the simulated payment to confirm your reservation.</p></div>
+  <div class="page-title"><span class="eyebrow">STEP 3 OF 3</span><h1>Secure Payment</h1><p>Verify your payment and complete the reservation using Razorpay Test Mode.</p></div>
   <div class="payment-layout">
     <section class="card">
-      <div class="secure-banner">🔒 Secure checkout · Demo mode</div>
-      <h2>Choose payment method</h2>
-      <form method="post" action="/bookings/create" id="paymentForm">
+      <div class="secure-banner">🔒 Razorpay Checkout · TEST MODE</div>
+      <h2>Payment verification</h2>
+      <p class="muted">No real money is charged. SkyReserve first verifies your account with a one-time OTP, then opens Razorpay's sandbox checkout. Razorpay may also display its own simulated card/bank OTP step.</p>
+
+      <input type="hidden" id="csrf" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+      <input type="hidden" id="scheduleId" th:value="${schedule.id}">
+      <input type="hidden" id="passengerName" th:value="${passengerName}">
+      <input type="hidden" id="seatNumber" th:value="${seatNumber}">
+      <input type="hidden" id="seatClass" th:value="${seatClass}">
+
+      <div class="otp-box" th:if="${razorpayEnabled}">
+        <h3 style="margin-top:0">1. Verify with OTP</h3>
+        <p class="muted small">We'll send a 6-digit payment verification code to your registered email.</p>
+        <button class="btn" type="button" id="sendOtpBtn" onclick="sendOtp()">Send OTP</button>
+        <div id="otpEntry" style="display:none;margin-top:14px">
+          <div class="otp-row">
+            <label>Enter OTP<input id="otpInput" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••"></label>
+            <button class="btn" type="button" id="verifyOtpBtn" onclick="verifyOtp()">Verify OTP</button>
+          </div>
+        </div>
+        <p id="otpStatus" class="otp-status muted"></p>
+      </div>
+
+      <h3 th:if="${razorpayEnabled}">2. Complete Razorpay payment</h3>
+      <button class="btn primary full pay-btn disabled-btn" type="button" id="razorpayBtn" th:if="${razorpayEnabled}" disabled onclick="startRazorpay()">Verify OTP to continue · ₹<span th:text="${#numbers.formatDecimal(total,1,2)}"></span></button>
+
+      <form method="post" action="/bookings/create" id="demoForm" th:unless="${razorpayEnabled}">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
         <input type="hidden" name="scheduleId" th:value="${schedule.id}">
         <input type="hidden" name="passengerName" th:value="${passengerName}">
         <input type="hidden" name="seatNumber" th:value="${seatNumber}">
         <input type="hidden" name="seatClass" th:value="${seatClass}">
-        <input type="hidden" name="paymentMethod" id="paymentMethod" value="UPI">
-        <div class="payment-tabs">
-          <button type="button" class="payment-tab active" onclick="payTab('upi',this)">UPI</button>
-          <button type="button" class="payment-tab" onclick="payTab('card',this)">Credit / Debit Card</button>
-          <button type="button" class="payment-tab" onclick="payTab('bank',this)">Net Banking</button>
-          <button type="button" class="payment-tab" onclick="payTab('wallet',this)">Wallets</button>
-        </div>
-        <div id="pay-upi" class="payment-panel active">
-          <p class="muted">Select a demo UPI application.</p>
-          <div class="upi-grid"><button type="button" onclick="selectPay('Google Pay',this)">G<br><small>Google Pay</small></button><button type="button" onclick="selectPay('PhonePe',this)">पे<br><small>PhonePe</small></button><button type="button" onclick="selectPay('Paytm UPI',this)">P<br><small>Paytm</small></button><button type="button" onclick="selectPay('BHIM UPI',this)">B<br><small>BHIM</small></button></div>
-          <label>UPI ID (demo)<input placeholder="name@upi"></label>
-        </div>
-        <div id="pay-card" class="payment-panel">
-          <label>Card number<input placeholder="1234 5678 9012 3456" maxlength="19"></label>
-          <label>Card holder<input placeholder="Name on card"></label>
-          <div class="two-col"><label>Expiry<input placeholder="MM/YY"></label><label>CVV<input type="password" placeholder="•••" maxlength="4"></label></div>
-        </div>
-        <div id="pay-bank" class="payment-panel"><label>Select bank<select onchange="selectPay(this.value,this)"><option>State Bank of India</option><option>HDFC Bank</option><option>ICICI Bank</option><option>Axis Bank</option></select></label></div>
-        <div id="pay-wallet" class="payment-panel"><div class="wallet-options"><button type="button" onclick="selectPay('Paytm Wallet',this)">Paytm Wallet</button><button type="button" onclick="selectPay('Amazon Pay',this)">Amazon Pay</button><button type="button" onclick="selectPay('MobiKwik',this)">MobiKwik</button></div></div>
-        <button class="btn primary full pay-btn" type="submit">Pay ₹<span th:text="${#numbers.formatDecimal(total,1,2)}"></span> & Confirm Booking</button>
-        <p class="muted small center">No real money or payment credentials are processed. This is a realistic payment-gateway simulation for the internship project.</p>
+        <input type="hidden" name="paymentMethod" value="Demo UPI">
+        <button class="btn primary full pay-btn" type="submit">Use Demo Payment</button>
       </form>
+
+      <p id="paymentError" class="muted small center" style="display:none"></p>
+      <p class="muted small center">Never enter real card details outside Razorpay Test Mode.</p>
     </section>
-    <aside class="card summary-card"><span class="eyebrow">ORDER SUMMARY</span><h2 th:text="${flight.flightNumber}"></h2><p><b th:text="${flight.source}"></b> → <b th:text="${flight.destination}"></b></p><p th:text="${schedule.travelDate}"></p><p>Passenger <b th:text="${passengerName}"></b></p><p>Seat <b th:text="${seatNumber}"></b></p><p>Class <b th:text="${seatClass}"></b></p><hr><p>Base fare <b th:text="${'₹'+#numbers.formatDecimal(fare,1,2)}"></b></p><p>Service fee <b th:text="${'₹'+#numbers.formatDecimal(serviceFee,1,2)}"></b></p><p class="total-line">Total <b th:text="${'₹'+#numbers.formatDecimal(total,1,2)}"></b></p></aside>
+
+    <aside class="card summary-card">
+      <span class="eyebrow">ORDER SUMMARY</span><h2 th:text="${flight.flightNumber}"></h2>
+      <p><b th:text="${flight.source}"></b> → <b th:text="${flight.destination}"></b></p>
+      <p th:text="${schedule.travelDate}"></p><p>Passenger <b th:text="${passengerName}"></b></p>
+      <p>Seat <b th:text="${seatNumber}"></b></p><p>Class <b th:text="${seatClass}"></b></p><hr>
+      <p>Base fare <b th:text="${'₹'+#numbers.formatDecimal(fare,1,2)}"></b></p>
+      <p>Service fee <b th:text="${'₹'+#numbers.formatDecimal(serviceFee,1,2)}"></b></p>
+      <p class="total-line">Total <b th:text="${'₹'+#numbers.formatDecimal(total,1,2)}"></b></p>
+    </aside>
   </div>
 </main>
-<script>
-function payTab(id,btn){document.querySelectorAll('.payment-panel').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.payment-tab').forEach(x=>x.classList.remove('active'));document.getElementById('pay-'+id).classList.add('active');btn.classList.add('active');const names={upi:'UPI',card:'Credit/Debit Card',bank:'Net Banking',wallet:'Digital Wallet'};document.getElementById('paymentMethod').value=names[id]||'UPI';}
-function selectPay(name,el){document.getElementById('paymentMethod').value=name;document.querySelectorAll('.payment-option-selected').forEach(x=>x.classList.remove('payment-option-selected'));if(el)el.classList.add('payment-option-selected');}
+
+<script th:inline="javascript">
+function showError(message){const e=document.getElementById('paymentError');e.textContent=message||'Payment could not be completed. Please try again.';e.style.display='block';}
+function csrf(){return document.getElementById('csrf').value;}
+function checkoutBody(){return new URLSearchParams({scheduleId:document.getElementById('scheduleId').value,passengerName:document.getElementById('passengerName').value,seatNumber:document.getElementById('seatNumber').value,seatClass:document.getElementById('seatClass').value});}
+
+async function sendOtp(){
+  const btn=document.getElementById('sendOtpBtn'); const status=document.getElementById('otpStatus');
+  btn.disabled=true; btn.textContent='Sending OTP...'; status.textContent='';
+  try{
+    const response=await fetch('/bookings/razorpay/otp/send',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRF-TOKEN':csrf()},body:checkoutBody()});
+    const result=await response.json(); if(!response.ok||!result.success)throw new Error(result.error||'Unable to send OTP.');
+    document.getElementById('otpEntry').style.display='block';
+    status.textContent=result.message||'OTP sent.';
+    if(result.demoOtp){status.innerHTML+=' <span class="demo-otp">Demo OTP: '+result.demoOtp+'</span>';}
+    btn.textContent='Resend OTP'; setTimeout(()=>btn.disabled=false,30000);
+  }catch(error){btn.disabled=false;btn.textContent='Send OTP';status.textContent=error.message;}
+}
+
+async function verifyOtp(){
+  const input=document.getElementById('otpInput').value.trim(); const btn=document.getElementById('verifyOtpBtn'); const status=document.getElementById('otpStatus');
+  if(!/^\d{6}$/.test(input)){status.textContent='Enter the 6-digit OTP.';return;}
+  btn.disabled=true; btn.textContent='Verifying...';
+  try{
+    const response=await fetch('/bookings/razorpay/otp/verify',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRF-TOKEN':csrf()},body:new URLSearchParams({otp:input})});
+    const result=await response.json(); if(!response.ok||!result.success)throw new Error(result.error||'OTP verification failed.');
+    status.className='otp-status success-text'; status.textContent=result.message;
+    const pay=document.getElementById('razorpayBtn'); pay.disabled=false; pay.classList.remove('disabled-btn'); pay.textContent='Pay ₹'+/*[[${#numbers.formatDecimal(total,1,2)}]]*/'0.00'+' with Razorpay';
+  }catch(error){btn.disabled=false;btn.textContent='Verify OTP';status.className='otp-status';status.textContent=error.message;}
+}
+
+async function startRazorpay(){
+  const button=document.getElementById('razorpayBtn'); button.disabled=true; button.textContent='Opening secure checkout...';
+  try{
+    const orderResponse=await fetch('/bookings/razorpay/order',{method:'POST',headers:{'X-CSRF-TOKEN':csrf()}});
+    const order=await orderResponse.json(); if(!orderResponse.ok||order.error)throw new Error(order.error||'Unable to create Razorpay order.');
+    const options={key:order.key,amount:order.amount,currency:order.currency,name:order.name,description:order.description,order_id:order.orderId,theme:{color:'#6f2cff'},prefill:{name:/*[[${passengerName}]]*/'',email:''},handler:async function(response){
+      try{
+        const verifyBody=new URLSearchParams({razorpay_order_id:response.razorpay_order_id,razorpay_payment_id:response.razorpay_payment_id,razorpay_signature:response.razorpay_signature});
+        const verifyResponse=await fetch('/bookings/razorpay/verify',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRF-TOKEN':csrf()},body:verifyBody});
+        const result=await verifyResponse.json(); if(!verifyResponse.ok||!result.success)throw new Error(result.error||'Payment verification failed.');
+        window.location.href='/bookings/'+encodeURIComponent(result.bookingReference);
+      }catch(error){button.disabled=false;showError(error.message);}
+    },modal:{ondismiss:function(){button.disabled=false;button.textContent='Pay with Razorpay';}}};
+    new Razorpay(options).open();
+  }catch(error){button.disabled=false;button.textContent='Pay with Razorpay';showError(error.message);}
+}
 </script>
 </body></html>
