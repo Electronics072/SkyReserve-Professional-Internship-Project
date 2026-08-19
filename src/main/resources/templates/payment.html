@@ -1,47 +1,1064 @@
 <!doctype html>
 <html xmlns:th="http://www.thymeleaf.org">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Payment | SkyReserve</title><link rel="stylesheet" href="/css/style.css"></head>
-<body><div th:replace="~{fragments :: nav}"></div>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Payment | SkyReserve</title>
+
+  <link rel="stylesheet" href="/css/style.css">
+
+  <!-- Razorpay Checkout -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+
+<body>
+
+<div th:replace="~{fragments :: nav}"></div>
+
 <main class="container narrow">
-  <div class="page-title"><span class="eyebrow">STEP 3 OF 3</span><h1>Secure Demo Payment</h1><p>Complete the simulated payment to confirm your reservation.</p></div>
-  <div class="payment-layout">
-    <section class="card">
-      <div class="secure-banner">🔒 Secure checkout · Demo mode</div>
-      <h2>Choose payment method</h2>
-      <form method="post" action="/bookings/create" id="paymentForm">
-        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-        <input type="hidden" name="scheduleId" th:value="${schedule.id}">
-        <input type="hidden" name="passengerName" th:value="${passengerName}">
-        <input type="hidden" name="seatNumber" th:value="${seatNumber}">
-        <input type="hidden" name="seatClass" th:value="${seatClass}">
-        <input type="hidden" name="paymentMethod" id="paymentMethod" value="UPI">
-        <div class="payment-tabs">
-          <button type="button" class="payment-tab active" onclick="payTab('upi',this)">UPI</button>
-          <button type="button" class="payment-tab" onclick="payTab('card',this)">Credit / Debit Card</button>
-          <button type="button" class="payment-tab" onclick="payTab('bank',this)">Net Banking</button>
-          <button type="button" class="payment-tab" onclick="payTab('wallet',this)">Wallets</button>
-        </div>
-        <div id="pay-upi" class="payment-panel active">
-          <p class="muted">Select a demo UPI application.</p>
-          <div class="upi-grid"><button type="button" onclick="selectPay('Google Pay',this)">G<br><small>Google Pay</small></button><button type="button" onclick="selectPay('PhonePe',this)">पे<br><small>PhonePe</small></button><button type="button" onclick="selectPay('Paytm UPI',this)">P<br><small>Paytm</small></button><button type="button" onclick="selectPay('BHIM UPI',this)">B<br><small>BHIM</small></button></div>
-          <label>UPI ID (demo)<input placeholder="name@upi"></label>
-        </div>
-        <div id="pay-card" class="payment-panel">
-          <label>Card number<input placeholder="1234 5678 9012 3456" maxlength="19"></label>
-          <label>Card holder<input placeholder="Name on card"></label>
-          <div class="two-col"><label>Expiry<input placeholder="MM/YY"></label><label>CVV<input type="password" placeholder="•••" maxlength="4"></label></div>
-        </div>
-        <div id="pay-bank" class="payment-panel"><label>Select bank<select onchange="selectPay(this.value,this)"><option>State Bank of India</option><option>HDFC Bank</option><option>ICICI Bank</option><option>Axis Bank</option></select></label></div>
-        <div id="pay-wallet" class="payment-panel"><div class="wallet-options"><button type="button" onclick="selectPay('Paytm Wallet',this)">Paytm Wallet</button><button type="button" onclick="selectPay('Amazon Pay',this)">Amazon Pay</button><button type="button" onclick="selectPay('MobiKwik',this)">MobiKwik</button></div></div>
-        <button class="btn primary full pay-btn" type="submit">Pay ₹<span th:text="${#numbers.formatDecimal(total,1,2)}"></span> & Confirm Booking</button>
-        <p class="muted small center">No real money or payment credentials are processed. This is a realistic payment-gateway simulation for the internship project.</p>
-      </form>
-    </section>
-    <aside class="card summary-card"><span class="eyebrow">ORDER SUMMARY</span><h2 th:text="${flight.flightNumber}"></h2><p><b th:text="${flight.source}"></b> → <b th:text="${flight.destination}"></b></p><p th:text="${schedule.travelDate}"></p><p>Passenger <b th:text="${passengerName}"></b></p><p>Seat <b th:text="${seatNumber}"></b></p><p>Class <b th:text="${seatClass}"></b></p><hr><p>Base fare <b th:text="${'₹'+#numbers.formatDecimal(fare,1,2)}"></b></p><p>Service fee <b th:text="${'₹'+#numbers.formatDecimal(serviceFee,1,2)}"></b></p><p class="total-line">Total <b th:text="${'₹'+#numbers.formatDecimal(total,1,2)}"></b></p></aside>
+
+  <!-- ==============================
+       PAGE TITLE
+       ============================== -->
+
+  <div class="page-title">
+
+        <span class="eyebrow">
+            STEP 3 OF 3
+        </span>
+
+    <h1>
+      Secure Payment
+    </h1>
+
+    <p>
+      Complete your payment securely using Razorpay Test Mode.
+    </p>
+
   </div>
+
+
+  <div class="payment-layout">
+
+
+    <!-- ==============================
+         PAYMENT SECTION
+         ============================== -->
+
+    <section class="card">
+
+      <div class="secure-banner">
+        🔒 Secure checkout · Razorpay Test Mode
+      </div>
+
+
+      <!-- ==============================
+           OTP VERIFICATION
+           ============================== -->
+
+      <div
+              class="card"
+              style="margin-bottom:25px;"
+      >
+
+        <h2>
+          1. Verify Payment with OTP
+        </h2>
+
+
+        <p class="muted">
+          Enter the 6-digit demo OTP to continue to Razorpay.
+        </p>
+
+
+        <!-- SEND OTP -->
+
+        <button
+                type="button"
+                class="btn primary"
+                onclick="generateDemoOtp()"
+        >
+          Send OTP
+        </button>
+
+
+        <!-- OTP INPUT SECTION -->
+
+        <div
+                id="otpSection"
+                style="display:none; margin-top:20px;"
+        >
+
+          <label>
+            Enter OTP
+
+            <input
+                    type="text"
+                    id="otpInput"
+                    maxlength="6"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    placeholder="Enter 6-digit OTP"
+            >
+
+          </label>
+
+
+          <button
+                  type="button"
+                  class="btn primary"
+                  onclick="verifyOtp()"
+          >
+            Verify OTP
+          </button>
+
+
+          <p
+                  id="otpMessage"
+                  class="muted"
+          ></p>
+
+        </div>
+
+      </div>
+
+
+      <!-- ==============================
+           RAZORPAY PAYMENT
+           ============================== -->
+
+      <h2>
+        2. Complete Razorpay Payment
+      </h2>
+
+
+      <p class="muted">
+        After OTP verification, continue to Razorpay Test Mode.
+      </p>
+
+
+      <!-- PAY BUTTON -->
+
+      <button
+              type="button"
+              id="razorpayButton"
+              class="btn primary full pay-btn"
+              onclick="startRazorpayPayment()"
+              disabled
+      >
+
+        Verify OTP to Pay ₹
+
+        <span
+                th:text="${#numbers.formatDecimal(total,1,2)}"
+        ></span>
+
+      </button>
+
+
+      <!-- PAYMENT MESSAGE -->
+
+      <p
+              id="paymentMessage"
+              class="muted center"
+      ></p>
+
+
+      <p class="muted small center">
+
+        This application uses Razorpay Test Mode.
+        No real money is charged.
+
+      </p>
+
+    </section>
+
+
+    <!-- ==============================
+         ORDER SUMMARY
+         ============================== -->
+
+    <aside class="card summary-card">
+
+            <span class="eyebrow">
+                ORDER SUMMARY
+            </span>
+
+
+      <h2
+              th:text="${flight.flightNumber}"
+      ></h2>
+
+
+      <p>
+
+        <b
+                th:text="${flight.source}"
+        ></b>
+
+        →
+
+        <b
+                th:text="${flight.destination}"
+        ></b>
+
+      </p>
+
+
+      <p
+              th:text="${schedule.travelDate}"
+      ></p>
+
+
+      <p>
+
+        Passenger
+
+        <b
+                th:text="${passengerName}"
+        ></b>
+
+      </p>
+
+
+      <p>
+
+        Seat
+
+        <b
+                th:text="${seatNumber}"
+        ></b>
+
+      </p>
+
+
+      <p>
+
+        Class
+
+        <b
+                th:text="${seatClass}"
+        ></b>
+
+      </p>
+
+
+      <hr>
+
+
+      <p>
+
+        Base fare
+
+        <b
+                th:text="${'₹'+#numbers.formatDecimal(fare,1,2)}"
+        ></b>
+
+      </p>
+
+
+      <p>
+
+        Service fee
+
+        <b
+                th:text="${'₹'+#numbers.formatDecimal(serviceFee,1,2)}"
+        ></b>
+
+      </p>
+
+
+      <p class="total-line">
+
+        Total
+
+        <b
+                th:text="${'₹'+#numbers.formatDecimal(total,1,2)}"
+        ></b>
+
+      </p>
+
+    </aside>
+
+  </div>
+
 </main>
-<script>
-function payTab(id,btn){document.querySelectorAll('.payment-panel').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.payment-tab').forEach(x=>x.classList.remove('active'));document.getElementById('pay-'+id).classList.add('active');btn.classList.add('active');const names={upi:'UPI',card:'Credit/Debit Card',bank:'Net Banking',wallet:'Digital Wallet'};document.getElementById('paymentMethod').value=names[id]||'UPI';}
-function selectPay(name,el){document.getElementById('paymentMethod').value=name;document.querySelectorAll('.payment-option-selected').forEach(x=>x.classList.remove('payment-option-selected'));if(el)el.classList.add('payment-option-selected');}
+
+
+<script th:inline="javascript">
+
+
+  /* ==========================================================
+     SERVER VALUES
+     ========================================================== */
+
+
+  const scheduleId =
+          /*[[${schedule.id}]]*/ 0;
+
+
+  const passengerName =
+          /*[[${passengerName}]]*/ '';
+
+
+  const seatNumber =
+          /*[[${seatNumber}]]*/ '';
+
+
+  const seatClass =
+          /*[[${seatClass}]]*/ '';
+
+
+  const totalAmount =
+          /*[[${total}]]*/ 0;
+
+
+  const csrfToken =
+          /*[[${_csrf.token}]]*/ '';
+
+
+  const csrfParameterName =
+          /*[[${_csrf.parameterName}]]*/ '_csrf';
+
+
+
+  /* ==========================================================
+     OTP SYSTEM
+     ========================================================== */
+
+
+  let generatedOtp = null;
+
+
+
+  /*
+   * Generate demo OTP
+   */
+
+  function generateDemoOtp() {
+
+    generatedOtp =
+            Math.floor(
+                    100000 +
+                    Math.random() * 900000
+            ).toString();
+
+
+    document.getElementById(
+            "otpSection"
+    ).style.display = "block";
+
+
+    document.getElementById(
+            "otpMessage"
+    ).innerHTML =
+
+            "Demo OTP sent: " +
+
+            "<strong>" +
+
+            generatedOtp +
+
+            "</strong>";
+
+
+    document.getElementById(
+            "otpInput"
+    ).value = "";
+
+
+    console.log(
+            "SkyReserve Demo OTP:",
+            generatedOtp
+    );
+
+  }
+
+
+
+  /*
+   * Verify demo OTP
+   */
+
+  function verifyOtp() {
+
+    const enteredOtp =
+
+            document
+                    .getElementById("otpInput")
+                    .value
+                    .trim();
+
+
+    const message =
+
+            document.getElementById(
+                    "otpMessage"
+            );
+
+
+    /*
+     * OTP has not been generated
+     */
+
+    if (!generatedOtp) {
+
+      message.innerHTML =
+              "Please click Send OTP first.";
+
+      message.style.color = "red";
+
+      return;
+    }
+
+
+    /*
+     * Correct OTP
+     */
+
+    if (enteredOtp === generatedOtp) {
+
+      message.innerHTML =
+              "✅ OTP verified. You can now continue to Razorpay.";
+
+      message.style.color = "green";
+
+
+      /*
+       * Enable Razorpay button
+       */
+
+      const razorpayButton =
+
+              document.getElementById(
+                      "razorpayButton"
+              );
+
+
+      razorpayButton.disabled = false;
+
+
+      razorpayButton.innerHTML =
+
+              "Pay ₹" +
+
+              Number(totalAmount).toFixed(2) +
+
+              " with Razorpay";
+
+    }
+
+
+    /*
+     * Incorrect OTP
+     */
+
+    else {
+
+      message.innerHTML =
+              "❌ Invalid OTP. Please try again.";
+
+      message.style.color = "red";
+
+    }
+
+  }
+
+
+
+  /* ==========================================================
+     RAZORPAY PAYMENT
+     ========================================================== */
+
+
+  async function startRazorpayPayment() {
+
+
+    const paymentMessage =
+
+            document.getElementById(
+                    "paymentMessage"
+            );
+
+
+    paymentMessage.innerText =
+            "Creating Razorpay order...";
+
+
+    try {
+
+
+      /* ==================================================
+         CREATE FORM DATA
+         ================================================== */
+
+
+      const formData =
+              new URLSearchParams();
+
+
+      formData.append(
+              "scheduleId",
+              scheduleId
+      );
+
+
+      formData.append(
+              "seatClass",
+              seatClass
+      );
+
+
+      formData.append(
+              csrfParameterName,
+              csrfToken
+      );
+
+
+
+      /* ==================================================
+         CREATE RAZORPAY ORDER
+         ================================================== */
+
+
+      const response =
+
+              await fetch(
+                      "/bookings/razorpay/order",
+                      {
+
+                        method: "POST",
+
+                        headers: {
+
+                          "Content-Type":
+                                  "application/x-www-form-urlencoded"
+
+                        },
+
+                        body:
+                                formData.toString()
+
+                      }
+              );
+
+
+
+      /* ==================================================
+         CHECK SERVER RESPONSE
+         ================================================== */
+
+
+      if (!response.ok) {
+
+        throw new Error(
+                "Unable to create Razorpay order."
+        );
+
+      }
+
+
+
+      /* ==================================================
+         READ ORDER JSON
+         ================================================== */
+
+
+      const order =
+              await response.json();
+
+
+      console.log(
+              "SkyReserve Razorpay Order:",
+              order
+      );
+
+
+
+      /* ==================================================
+         RAZORPAY CHECKOUT OPTIONS
+         ================================================== */
+
+
+      const options = {
+
+
+        /*
+         * Razorpay Test Key ID
+         *
+         * This value comes from
+         * application.properties:
+         *
+         * razorpay.key.id=${RAZORPAY_KEY_ID}
+         */
+
+        key: /*[[${@environment.getProperty('razorpay.key.id')}]]*/ '',
+
+
+        /*
+         * Amount from server
+         */
+
+        amount:
+        order.amount,
+
+
+        /*
+         * Currency
+         */
+
+        currency:
+        order.currency,
+
+
+        /*
+         * Business name
+         */
+
+        name:
+                "SkyReserve",
+
+
+        /*
+         * Payment description
+         */
+
+        description:
+                "Flight Reservation Payment",
+
+
+        /*
+         * Razorpay order ID
+         */
+
+        order_id:
+        order.id,
+
+
+
+        /* ==================================================
+           PAYMENT METHOD DISPLAY CONFIGURATION
+           ================================================== */
+
+        config: {
+
+          display: {
+
+            blocks: {
+
+              skyreserve_payment_methods: {
+
+                name:
+                        "Payment Options",
+
+
+                instruments: [
+
+                  /*
+                   * UPI
+                   */
+
+                  {
+                    method:
+                            "upi"
+                  },
+
+
+                  /*
+                   * Cards
+                   */
+
+                  {
+                    method:
+                            "card"
+                  },
+
+
+                  /*
+                   * Netbanking
+                   */
+
+                  {
+                    method:
+                            "netbanking"
+                  },
+
+
+                  /*
+                   * Wallet
+                   */
+
+                  {
+                    method:
+                            "wallet"
+                  },
+
+
+                  /*
+                   * Pay Later
+                   */
+
+                  {
+                    method:
+                            "paylater"
+                  }
+
+                ]
+
+              }
+
+            },
+
+
+            /*
+             * Display our custom block first
+             */
+
+            sequence: [
+
+              "block.skyreserve_payment_methods"
+
+            ],
+
+
+            /*
+             * Do not display duplicate
+             * default Razorpay blocks
+             */
+
+            preferences: {
+
+              show_default_blocks:
+                      false
+
+            }
+
+          }
+
+        },
+
+
+
+        /* ==================================================
+           PREFILL CUSTOMER INFORMATION
+           ================================================== */
+
+
+        prefill: {
+
+          name:
+          passengerName
+
+        },
+
+
+
+        /* ==================================================
+           THEME
+           ================================================== */
+
+
+        theme: {
+
+          color:
+                  "#1976d2"
+
+        },
+
+
+
+        /* ==================================================
+           PAYMENT SUCCESS HANDLER
+           ================================================== */
+
+
+        handler:
+                function (response) {
+
+
+                  paymentMessage.innerHTML =
+
+                          "✅ Razorpay payment successful.<br>" +
+
+                          "Payment ID: " +
+
+                          response.razorpay_payment_id;
+
+
+
+                  /*
+                   * Complete SkyReserve booking
+                   */
+
+                  completeBooking(
+
+                          response.razorpay_payment_id,
+
+                          response.razorpay_order_id,
+
+                          response.razorpay_signature
+
+                  );
+
+                },
+
+
+
+        /* ==================================================
+           MODAL
+           ================================================== */
+
+
+        modal: {
+
+          ondismiss:
+                  function () {
+
+                    paymentMessage.innerText =
+                            "Payment cancelled.";
+
+                  }
+
+        }
+
+      };
+
+
+
+      /* ==================================================
+         CREATE RAZORPAY INSTANCE
+         ================================================== */
+
+
+      const razorpay =
+              new Razorpay(options);
+
+
+
+      /* ==================================================
+         PAYMENT FAILURE HANDLER
+         ================================================== */
+
+
+      razorpay.on(
+              "payment.failed",
+
+              function (response) {
+
+
+                console.error(
+                        "Razorpay Payment Failed:",
+                        response
+                );
+
+
+                paymentMessage.innerHTML =
+
+                        "❌ Payment failed: " +
+
+                        response.error.description;
+
+              }
+      );
+
+
+
+      /* ==================================================
+         OPEN RAZORPAY CHECKOUT
+         ================================================== */
+
+
+      razorpay.open();
+
+
+    }
+
+
+            /* ======================================================
+               ERROR HANDLING
+               ====================================================== */
+
+
+    catch (error) {
+
+
+      console.error(
+              "SkyReserve Razorpay Error:",
+              error
+      );
+
+
+      paymentMessage.innerText =
+              "❌ " + error.message;
+
+    }
+
+  }
+
+
+
+  /* ==========================================================
+     COMPLETE BOOKING
+     ========================================================== */
+
+
+  function completeBooking(
+          paymentId,
+          orderId,
+          signature
+  ) {
+
+
+    const form =
+            document.createElement("form");
+
+
+    form.method =
+            "POST";
+
+
+    form.action =
+            "/bookings/create";
+
+
+
+    /* ==================================================
+       BOOKING DATA
+       ================================================== */
+
+
+    addHiddenField(
+            form,
+            "scheduleId",
+            scheduleId
+    );
+
+
+    addHiddenField(
+            form,
+            "passengerName",
+            passengerName
+    );
+
+
+    addHiddenField(
+            form,
+            "seatNumber",
+            seatNumber
+    );
+
+
+    addHiddenField(
+            form,
+            "seatClass",
+            seatClass
+    );
+
+
+    addHiddenField(
+            form,
+            "paymentMethod",
+            "Razorpay"
+    );
+
+
+
+    /* ==================================================
+       RAZORPAY DATA
+       ================================================== */
+
+
+    addHiddenField(
+            form,
+            "razorpayPaymentId",
+            paymentId
+    );
+
+
+    addHiddenField(
+            form,
+            "razorpayOrderId",
+            orderId
+    );
+
+
+    addHiddenField(
+            form,
+            "razorpaySignature",
+            signature
+    );
+
+
+
+    /* ==================================================
+       CSRF
+       ================================================== */
+
+
+    addHiddenField(
+            form,
+            csrfParameterName,
+            csrfToken
+    );
+
+
+
+    /* ==================================================
+       SUBMIT BOOKING
+       ================================================== */
+
+
+    document.body.appendChild(
+            form
+    );
+
+
+    form.submit();
+
+  }
+
+
+
+  /* ==========================================================
+     ADD HIDDEN FORM FIELD
+     ========================================================== */
+
+
+  function addHiddenField(
+          form,
+          name,
+          value
+  ) {
+
+
+    const input =
+            document.createElement(
+                    "input"
+            );
+
+
+    input.type =
+            "hidden";
+
+
+    input.name =
+            name;
+
+
+    input.value =
+            value;
+
+
+    form.appendChild(
+            input
+    );
+
+  }
+
 </script>
-</body></html>
+
+</body>
+
+</html>
